@@ -1,0 +1,216 @@
+<html>
+<head>
+	<title>webglbing</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.js"></script>
+    <script src="js/Three.js"></script>
+    <script src="js/dat.gui.min.js"></script>
+    <script src="js/TileSystem.js"></script>
+	<script>
+
+    function CameraPos() {
+          this.x = -400;
+          this.y = 1200;
+          this.z = 600;
+        };  
+    var camerapos = new CameraPos();
+    
+	window.addEventListener('load', function () {
+        loadScene();
+        animate();
+
+          
+
+
+
+        var text = camerapos;
+          var gui = new dat.GUI();
+          var c = gui.add(text, 'x', -500, 500).step(1);
+          c.onChange(function (value){
+            cam();
+          });
+          var c = gui.add(text, 'y', 0, 4000).step(1);
+          c.onChange(function (value){
+            cam();
+          });
+          var c = gui.add(text, 'z', -500, 500).step(1);
+          c.onChange(function (value){
+            cam();
+          });
+
+        function cam() {
+            camera.position.set(text.x, text.y, text.z);
+            camera.lookAt(scene.position);   
+        }
+        
+    }, false);
+
+
+    var scene, camera, renderer;
+
+    
+
+    function loadScene() {
+        var world = document.getElementById('world'),
+            WIDTH = window.innerWidth,
+            HEIGHT = window.innerHeight,
+            VIEW_ANGLE = 45,
+            ASPECT = WIDTH / HEIGHT,
+            NEAR = 0.1,
+            FAR = 10000;
+
+        scene = new THREE.Scene();
+
+        camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
+        camera.position.set(camerapos.x, camerapos.y, camerapos.z);
+        camera.lookAt(scene.position);    
+        scene.add(camera);
+
+
+        renderer = new THREE.WebGLRenderer( { antialias: true} );
+        renderer.setSize(WIDTH, HEIGHT);
+        world.appendChild(renderer.domElement);
+
+        var pointLight = new THREE.PointLight(0xFFFFFF);
+        pointLight.position.set(CameraPos.x, CameraPos.y, CameraPos.z);
+        pointLight.intensity = 100;
+        scene.add(pointLight); 
+
+        // add directional light source
+        // var directionalLight = new THREE.DirectionalLight(0xffffff);
+        // directionalLight.position.set(210, 10, 210).normalize();
+        // directionalLight.castShadow = true;
+        // scene.add(directionalLight);
+
+        var dl = new THREE.DirectionalLight(0xff0000);
+        dl.position.set(210, 200, 20).normalize();
+        dl.intensity = 10;
+        dl.castShadow = true;
+        scene.add(dl);
+
+renderer.shadowMapEnabled = true;
+
+                
+            
+url = '/bing?areaSouth=49&areaWest=8&areaNorth=50&areaEast=9&mapsizeX=400&mapsizeY=400';
+                
+
+            
+    //         // spotlight #1 -- yellow, dark shadow
+    // var spotlight = new THREE.SpotLight(0xffff00);
+    // spotlight.position.set(-60,550,-30);
+    // //spotlight.shadowCameraVisible = true;
+    // spotlight.shadowDarkness = 0.95;
+    // spotlight.intensity = 0.1;
+    // // must enable shadow casting ability for the light
+    // spotlight.castShadow = true;
+    // scene.add(spotlight);
+            
+            
+ // Create an array of materials to be used in a cube, one for each side
+                var cubeMaterialArray = [];
+                // order to add materials: x+,x-,y+,y-,z+,z-
+                cubeMaterialArray.push( new THREE.MeshBasicMaterial( { color: 0x333333 } ) );
+                cubeMaterialArray.push( new THREE.MeshBasicMaterial( { color: 0x444444 } ) );
+                cubeMaterialArray.push( new THREE.MeshBasicMaterial( { color: 0x444444 } ) );
+                cubeMaterialArray.push( new THREE.MeshBasicMaterial( { color: 0x333333 } ) );
+                cubeMaterialArray.push( new THREE.MeshBasicMaterial( { color: 0x333333 } ) );
+                cubeMaterialArray.push( new THREE.MeshBasicMaterial( { color: 0x333333 } ) );
+                // Cube parameters: width (x), height (y), depth (z), 
+                //        (optional) segments along x, segments along y, segments along z, materials array
+                var cubeGeometry = new THREE.CubeGeometry( 100, 100, 100, 1, 1, 1, cubeMaterialArray );
+                // using THREE.MeshFaceMaterial() in the constructor below
+                //   causes the mesh to use the materials stored in the geometry
+                cube = new THREE.Mesh( cubeGeometry, new THREE.MeshFaceMaterial() );
+                cube.position.set(400, 0, 180);
+                cube.castShadow = true;
+                scene.add( cube );  
+
+
+                var lat = 49.2936, long = 8.6418, zoom = 12;
+                var p = TileSystem.latLongToPixelXY(lat, long, zoom);
+
+                var neighbours = 7;
+                var rows = 2 * neighbours + 1;
+                var cols = 2 * neighbours + 1;
+
+                var cnt = rows * cols;
+                console.log('rows:'+rows+',cols:'+cols)
+                for (var row = 1; row <= rows; row++) {
+                    for (var col = 1; col <= cols; col++ ) {
+                        //console.log('col='+col+',row='+row);
+                        var offsetX = (-cols+col) + neighbours;
+                        var offsetY = (-rows+row) + neighbours;
+
+                        x_ = p.pixelX + (256 * offsetX);
+                        y_ = p.pixelY + (256 * offsetY);
+                        var p_ = TileSystem.pixelXYToLatLong(x_, y_, zoom);
+                        lat = p_.latitude;
+                        long = p_.longitude;
+
+                        
+                        console.log(offsetX+','+offsetY);
+
+
+                        url = '/bing?centerX=' + long + '&centerY=' + lat + '&zoom=' + zoom + '&mapsizeX=256&mapsizeY=256';
+                        //console.log(url);
+                        // floor: mesh to receive shadows
+                        var floorTexture = new THREE.ImageUtils.loadTexture(url);
+                        //floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping; 
+                        //floorTexture.repeat.set( 10, 10 );
+                        // Note the change to Lambert material.
+                        var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture } );
+                        colors = [0xff0000, 0xff3366, 0x0099ff, 0x99ff, 0x00ff00, 0x009955, 0x44aabb, 0x992299];
+                        //var floorMaterial = new THREE.MeshBasicMaterial( { color: colors[i] } );
+                        var floorGeometry = new THREE.PlaneGeometry(256, 256, 1, 1);
+                        var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+                        var pos = { x: 0 + offsetX * 256, z: 0 + offsetY * 256, y: 0};
+                        //console.log(pos);
+                        floor.position.set(pos.x, pos.y, pos.z);
+                        floor.doubleSided = true;
+                        // Note the mesh is flagged to receive shadows
+                        floor.receiveShadow = true;
+                        scene.add(floor);
+                    }
+                }
+
+                
+                
+            //});
+    }
+
+var sphere, x = 100;
+    function animate() 
+    {
+
+        requestAnimationFrame( animate );
+
+        x += 1;
+        //sphere.position.set(x, 50, -50);
+        //sphere.rotation.set(0, x/100,0);
+
+
+        render();
+    }
+
+    function render() 
+    {   
+        renderer.render( scene, camera );
+    }
+</script>
+<style>
+html, body {
+    margin: 0;
+    height: 100%;
+    background:-webkit-radial-gradient(#eedd00 0%, orange 100%);
+}
+
+.world {
+    height: 100%;
+}
+</style>
+</head>
+<body style="">
+    <div id="world"></div>
+    <!--<canvas id="world" width="500" height="500"></canvas>-->
+</body>
+</html>
