@@ -1,6 +1,11 @@
-var LAT = 49.2936,
-    LONG = 8.6418,
-    ZOOM = 12;
+var lat = 49.2936;
+var long = 8.6418;
+var zoom = 12;
+var neighbours = 3;
+
+// duisburg
+var lat = 51.4314308166504;
+var long = 6.76392984390259;
 
 var camerapos = new CameraPos(),
     scene, 
@@ -10,30 +15,38 @@ var camerapos = new CameraPos(),
 window.addEventListener('load', init, false)
 
 function init () {
-
-    var lat = 49;
-    var long = 8;
-    var zoom = 3;
-
-    var p = TileSystem.latLongToPixelXY(lat, long, zoom);
-    console.log(p);
-    var tile = TileSystem.pixelXYToTileXY(p.pixelX, p.pixelY);
-    console.log(tile);
-    var qk = TileSystem.tileXYToQuadKey(tile.tileX, tile.tileY, zoom);
-    console.log(qk);
-    return;
-
-
-
     createGui();    
     loadScene();
     animate();
 }
 
+function matrix(lat, long, zoom, neighbours) {
+    var p = TileSystem.latLongToPixelXY(lat, long, zoom);
+    var tile = TileSystem.pixelXYToTileXY(p.pixelX, p.pixelY);
+    var tiles = [];
+    var tx = Math.floor(tile.tileX);
+    var ty = Math.floor(tile.tileY);
+    for (var y = -neighbours; y < neighbours + 1; y++) {
+        var yts = [];
+        tiles.push(yts);
+        for (var x = -neighbours; x < neighbours + 1; x++) {
+            var tx_ = tx + x;
+            var ty_ = ty + y;
+            var quadkey = TileSystem.tileXYToQuadKey(tx_, ty_, zoom);
+            yts.push(quadkey);
+            //console.log(tx_+','+ty_+','+quadkey);
+        }
+
+    }
+    return tiles;
+}
+
+
 function CameraPos() {
   this.x = -400;
   this.y = 1200;
   this.z = 600;
+  this.zoom = zoom;
 }
 
 function createGui () {
@@ -45,9 +58,17 @@ function createGui () {
     c.onChange(cam);
     var c = gui.add(text, 'z', -500, 500).step(1);
     c.onChange(cam);
+    var c = gui.add(text, 'zoom', 1, 25).step(1);
+    c.onChange(cam);
+
+    var lastZoom = zoom;
+
     function cam() {
         camera.position.set(text.x, text.y, text.z);
         camera.lookAt(scene.position);   
+        if (lastZoom != camerapos.zoom) {
+
+        }
     }
 }    
 
@@ -124,49 +145,50 @@ function loadScene() {
     cube = new THREE.Mesh( cubeGeometry, new THREE.MeshFaceMaterial() );
     cube.position.set(400, 0, 180);
     cube.castShadow = true;
-    scene.add( cube );  
+    scene.add( cube );
 
+    var m = matrix(lat, long, zoom, neighbours);
 
+    var flags = 'A'; // aerial
+    var flags = 'A,G'; // aerial + roads + borders
+    var flags = 'A,G,L'; // aerial + roads + borders + labels
 
-    var p = TileSystem.latLongToPixelXY(LAT, LONG, ZOOM),
-        neighbours = 7,
-        rows = 2 * neighbours + 1,
-        cols = 2 * neighbours + 1,
-        cnt = rows * cols;
+    var flags = 'G'; // roads + borders 
+    var flags = 'G,LA';
+    var flags = 'G,VE,BX,LA'; // roads + borders + labels
 
-    for (var row = 1; row <= rows; row++) {
-        for (var col = 1; col <= cols; col++ ) {
-            //console.log('col='+col+',row='+row);
-            var offsetX = (-cols+col) + neighbours;
-            var offsetY = (-rows+row) + neighbours;
+    var ground = new THREE.Object3D();
 
-            x_ = p.pixelX + (256 * offsetX);
-            y_ = p.pixelY + (256 * offsetY);
-            var p_ = TileSystem.pixelXYToLatLong(x_, y_, ZOOM);
-            lat = p_.latitude;
-            long = p_.longitude;
-
-            url = '/bing?centerX=' + long + '&centerY=' + lat + '&zoom=' + ZOOM + '&mapsizeX=256&mapsizeY=256';
-            // floor: mesh to receive shadows
-            var floorTexture = new THREE.ImageUtils.loadTexture(url);
-            //floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping; 
-            //floorTexture.repeat.set( 10, 10 );
-            // Note the change to Lambert material.
-            var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture } ),
-                floorGeometry = new THREE.PlaneGeometry(256, 256, 1, 1),
-                floor = new THREE.Mesh(floorGeometry, floorMaterial),
-                pos = { 
-                    x: 0 + offsetX * 256, 
-                    y: 0,
-                    z: 0 + offsetY * 256
-                };
-            floor.position.set(pos.x, pos.y, pos.z);
-            floor.doubleSided = true;
-            // Note the mesh is flagged to receive shadows
-            floor.receiveShadow = true;
-            scene.add(floor);
+    for (var y = 0; y < m.length; y++) {
+        for (var x = 0; x < m.length; x++) {
+            var qkey = m[y][x];
+            var url = '/comp?quadkey=' + qkey + '&flags=' + flags;
+            var obj = createTile(qkey, url);
+            var px = 0 + (-neighbours) + x;
+            var py = 0 + (-neighbours) + y;
+            px = px * 256;
+            py = py * 256;
+            obj.position.set(px, 0, py);
+            ground.add(obj);
+            YY = obj;
         }
-    };
+    }
+
+    scene.add(ground);
+}
+
+var YY = null;
+
+function createTile (quadkey, url) { 
+    // floor: mesh to receive shadows
+    var floorTexture = new THREE.ImageUtils.loadTexture(url);
+    var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture } );
+    var floorGeometry = new THREE.PlaneGeometry(256, 256, 1, 1);
+    var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.doubleSided = true;
+    // Note the mesh is flagged to receive shadows
+    floor.receiveShadow = true;
+    return floor;
 }
 
 function animate() {
