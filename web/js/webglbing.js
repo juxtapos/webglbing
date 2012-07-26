@@ -10,7 +10,22 @@ var camerapos = new CameraPos(),
 window.addEventListener('load', init, false)
 
 function init () {
-    createGui();
+
+    var lat = 49;
+    var long = 8;
+    var zoom = 3;
+
+    var p = TileSystem.latLongToPixelXY(lat, long, zoom);
+    console.log(p);
+    var tile = TileSystem.pixelXYToTileXY(p.pixelX, p.pixelY);
+    console.log(tile);
+    var qk = TileSystem.tileXYToQuadKey(tile.tileX, tile.tileY, zoom);
+    console.log(qk);
+    return;
+
+
+
+    createGui();    
     loadScene();
     animate();
 }
