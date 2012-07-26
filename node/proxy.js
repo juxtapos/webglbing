@@ -39,7 +39,16 @@ var querystring = require('querystring'),
   		  	if (PROXY && PROXY_PORT) {
   		  		path = 'http://' + host + path;
   				host = PROXY;
+<<<<<<< Updated upstream
   				port = 8080;	
+=======
+  				port = 8080;
+  				path = BING_HOST + path;
+  			} else {
+  				host = BING_HOST;
+  				port = 80;
+  				console.log('yo');
+>>>>>>> Stashed changes
   			}
 
 	  		// console.log('host:' + host);
