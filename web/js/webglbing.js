@@ -1,15 +1,19 @@
 var lat = 49.2936;
 var long = 8.6418;
-var zoom = 8;
+var zoom = 10;
 var neighbours = 3;
 
-// duisburg
-var lat = 51.4314308166504;
-var long = 6.76392984390259;
+// Walldorf
+var lat = 49.3028907775879;
+var long =  8.64297962188721;
 
-// Germany
-var lat = '51.2019996643066';
-var long = '10.3819999694824';
+// duisburg
+// var lat = 51.4314308166504;
+// var long = 6.76392984390259;
+
+// // Germany
+// var lat = '51.2019996643066';
+// var long = '10.3819999694824';
 
 var camerapos = new CameraPos(),
     scene, 
@@ -22,6 +26,12 @@ var mouse = { x: 0, y: 0 }, INTERSECTED;
 window.addEventListener('load', init, false)
 
 function init () {
+
+
+    // getEmployeeData();
+
+    // return;
+
     createGui();    
     loadScene();
     animate();
@@ -56,7 +66,6 @@ function matrix(lat, long, zoom, neighbours) {
             var ty_ = ty + y;
             var quadkey = TileSystem.tileXYToQuadKey(tx_, ty_, zoom);
             yts.push(quadkey);
-            //console.log(tx_+','+ty_+','+quadkey);
         }
 
     }
@@ -198,14 +207,15 @@ function loadScene() {
 }
 
 function createGround () {
-    console.log('cd')
     var m = matrix(lat, long, zoom, neighbours);
-    var flags = 'A'; // aerial
-    var flags = 'A,G'; // aerial + roads + borders
-    var flags = 'A,G,L'; // aerial + roads + borders + labels
-    var flags = 'G'; // roads + borders 
-    var flags = 'G,LA';
+    
+    // var flags = 'A'; // aerial
+    // var flags = 'A,G'; // aerial + roads + borders
+    // var flags = 'A,G,L'; // aerial + roads + borders + labels
+    // var flags = 'G'; // roads + borders 
+    // var flags = 'G,LA';
     var flags = 'G,VE,BX,LA'; // roads + borders + labels
+
     var ground = new THREE.Object3D();
 
     for (var y = 0; y < m.length; y++) {
@@ -264,8 +274,45 @@ function render() {
 
     for (var i = 1, l = ground.children.length; i < l; i++) {
         ground.children[i].lookAt(1, 500, 500);
-
     }
 
     renderer.render(scene, camera);
+}
+
+function getEmployeeData () {
+
+    var url = 'http://ldcigm3.wdf.sap.corp:50057/sap/opu/odata/sap/FINCUSTFACTSHEET/CompanyCodeCollection?sap-user=support&sap-password=support';
+    $.ajax({
+            url: url,
+            callback: 'test'
+        })
+        .done(function (data) {
+
+            function nsResolver(prefix) {
+                var ns = {
+                    'xhtml' : 'http://www.w3.org/1999/xhtml',
+                    'mathml': 'http://www.w3.org/1998/Math/MathML',
+                    'd': 'http://schemas.microsoft.com/ado/2007/08/dataservices',
+                    'atom':'http://www.w3.org/2005/Atom',
+                    'm': 'http://schemas.microsoft.com/ado/2007/08/dataservices/metadata',
+                    'sap': 'http://www.sap.com/Protocols/SAPData',
+                    'base':'http://d5ltdc00.wdf.sap.corp:57180/sap/opu/sdata/mive/employeelookup/'
+                };
+              return ns[prefix] || null;
+            }
+            var xpathResult = document.evaluate('//d:org_city', data, nsResolver, XPathResult.ANY_TYPE, null);  
+            console.log(xpathResult);
+            var result;
+            var thisNode = xpathResult.iterateNext();  
+            
+              while (thisNode) {  
+                console.log( thisNode);  
+                thisNode = xpathResult.iterateNext();  
+              }  
+
+        
+            // for ( var i=0 ; i < xpathResult.snapshotLength; i++ )  {  
+            //     console.log( xpathResult.snapshotItem(i).textContent );  
+            // }  
+        });
 }
