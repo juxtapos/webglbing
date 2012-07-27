@@ -1,5 +1,12 @@
-//var PROXY = '10.86.48.103', //'http://dewdfwdf03proxy.wdf.sap.corp:8080'
-//var PROXY_PORT = 8080;
+var LISTEN_PORT = 3000;
+var PROXY = '10.86.48.103';
+var PROXY_PORT = 8080;
+
+var routes = {
+	'/comp': bingQuadKeyRequest,
+	'/bing': bingStaticMapRequest,
+	'/finfact': finfact
+};
 
 var querystring = require('querystring'),
 	http = require('http'),
@@ -7,61 +14,76 @@ var querystring = require('querystring'),
     app = connect()
   		.use(connect.logger('dev'))
   		.use(connect.static('../web'))
-	 	.use(function(req, res){
-	 		var params = querystring.parse(req.url.substring(req.url.lastIndexOf('?') + 1));
-			if (req.url.indexOf('/comp') == 0) {
-				host = 'ecn.dynamic.t0.tiles.virtualearth.net';
-				console.log(params);
-				path =  '/comp/CompositionHandler/' + params['quadkey'] +'?mkt=en-us&it=' + params['flags'] + '&shading=hill&n=z';
-				port = 80;
-			} else if (req.url.indexOf('/bing') == 0) {
-	  		// 	var centerX = params.centerX,
-					// centerY = params.centerY,
-					// zoom = params.zoom || '',
-					// mapsizeX = params.mapsizeX || 256,
-					// mapsizeY = params.mapsizeY || 256,
-					// centerStr = params.centerX && params.centerY ? params.centerY + ',' + params.centerX + '/' : '',
-	  		// 		sizeStr = params.mapsizeX && params.mapsizeY ? 'mapSize=' + params.mapsizeX  + ',' + params.mapsizeY + '&' : '',
-	  		// 		areaStr = params.areaSouth && params.areaWest && params.areaNorth &&  params.areaEast ? 'mapArea=' + params.areaSouth + ',' +  params.areaWest + ',' +  params.areaNorth + ',' +  params.areaEast  + '&' : '',
-	  		// 		host = 'http://dev.virtualearth.net', 
-	  		// 		port = 80,
-	  		// 		path = '/REST/v1/Imagery/Map/Road/' + centerStr + zoom + '?' + sizeStr + areaStr + '&key=' + BING_KEY;
-	  		} else {
-	  			res.end();
-	  			return;
-	  		}
+	 	.use(dispatcher).listen(LISTEN_PORT);
 
-  		  	if (typeof PROXY != 'undefined' && typeof PROXY_PORT != 'undefined') {
-  		  		path = 'http://' + host + path;
-  				host = PROXY;
-  				port = 8080;
-  				path = BING_HOST + path;
+function dispatcher (req, res) {
+	var handlerFct = gethandler(req);
+	var opts;
+
+	if (!handlerFct) {
+		console.error('No request handler found for url ' + req.url);
+		return;
+	}
+	opts = handlerFct(req);
+	
+	// Detect proxy
+  	if (typeof PROXY != 'undefined' && typeof PROXY_PORT != 'undefined') {
+  		opts.path = 'http://' + opts.host + opts.path;
+		opts.port = PROXY_PORT;
+		opts.headers = {
+			'Host': opts.host
+		}
+		opts.host = PROXY;
+	}
+
+	//console.log(JSON.stringify(opts));
+
+  	var request = http.get(opts, 
+  		function (response) {
+  			// Copy destination response headers
+  			for (var headerkey in response.headers) {
+  				res.setHeader(headerkey, response.headers[headerkey]);
   			}
+		  	response.on('data', function (chunk) {
+		    	res.write(chunk);
+		  	});
+		  	response.on('end', function () {
+		  		res.end();
+		  	});
+	  	});
+}
 
-	  		// console.log('host:' + host);
-	  		// console.log('path:' + path);
-	  		// console.log('port:' + port);
+function gethandler (request) {
+	var url = request.url;
+	for (var r in routes) {
+		if (~url.indexOf(r)) {
+			return routes[r];
+		}
+	}
+}
 
-	  		// XXX Set correct host on proxy
+function bingQuadKeyRequest (request) {
+	var VIRTUALEARTH_HOST = 'ecn.dynamic.t0.tiles.virtualearth.net';
+	var params = querystring.parse(request.url.substring(request.url.lastIndexOf('?') + 1));
+	return {
+		host: VIRTUALEARTH_HOST,
+		path: '/comp/CompositionHandler/' + params['quadkey'] +'?mkt=en-us&it=' + params['flags'] + '&shading=hill&n=z',
+		port: 80
+	}
+}
 
-		  	var request = http.get({
-			 	host: host,
-			  	port: port,
-			  	path: path,
-			  	//headers: headers
-			  	}, function (rest) {
-			  		//console.log(rest.headers);
-			  		//res.setHeader('Content-Type', rest.headers['content-type']);
-			  		res.setHeader('Content-Type', 'image/png');
-			  		// The CORS header does *not* make the image 'untainted' (for raw image data access on the canvas).
-			  		//  That's the whole reason I'm abusing connect as a static webserver.
-			  		res.setHeader('Access-Control-Allow-Origin', '*');
-				  	rest.on('data', function (chunk) {
-				    	res.write(chunk);
-				  	});
-				  	rest.on('end', function () {
-				  		res.end();
-				  	});
-			  	}
-			);
-  }).listen(3000);
+function bingStaticMapRequest (request) {
+	// 	var centerX = params.centerX,
+	// centerY = params.centerY,
+	// zoom = params.zoom || '',
+	// mapsizeX = params.mapsizeX || 256,
+	// mapsizeY = params.mapsizeY || 256,
+	// centerStr = params.centerX && params.centerY ? params.centerY + ',' + params.centerX + '/' : '',
+	// 		sizeStr = params.mapsizeX && params.mapsizeY ? 'mapSize=' + params.mapsizeX  + ',' + params.mapsizeY + '&' : '',
+	// 		areaStr = params.areaSouth && params.areaWest && params.areaNorth &&  params.areaEast ? 'mapArea=' + params.areaSouth + ',' +  params.areaWest + ',' +  params.areaNorth + ',' +  params.areaEast  + '&' : '',
+	// 		host = 'http://dev.virtualearth.net', 
+	// 		port = 80,
+	// 		path = '/REST/v1/Imagery/Map/Road/' + centerStr + zoom + '?' + sizeStr + areaStr + '&key=' + BING_KEY;
+}
+
+function finfact () {}
